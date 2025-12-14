@@ -48,11 +48,11 @@ this one's more fun, 3d volumes and multiple organs. btcv dataset has like 13 di
 
 ``unzip btcv.zip``
 
-again, put it in the `data` folder. organization matters here. actually its part of the data dir itself, make sure when you run the train3d run command you map the check perfeclty, you can use ls -la to check all.
+again, put it in the `data` folder. organization matters here. actually its part of the data dir itself, make sure when you run the train3d run command you map the check perfeclty, you can use ls -la to check all. /workspace/sam3-dl/Medical-SAM2/data/btc, its inside btc for the training script to work make sure of that
 
 **step 2:** train on 3d data:
 
-``python train_3d.py -net sam2 -exp_name BTCV_MedSAM2 -sam_ckpt ./checkpoints/sam2_hiera_small.pt -sam_config sam2_hiera_s -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btcv``
+``python train_3d.py -net sam2 -exp_name BTCV_MedSAM2 -sam_ckpt ./checkpoints/sam2_hiera_small.pt -sam_config sam2_hiera_s -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btc``
 
 the `-prompt bbox` means we're using bounding box prompts (you can also use points or masks). `-prompt_freq 2` means every 2 epochs we'll do some prompt-based validation. play around with these if you want.
 
