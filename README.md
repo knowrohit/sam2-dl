@@ -32,9 +32,27 @@ this one's pretty straightforward. fundus images, segment the optic cup. classic
 
 make sure to put it in a `data` folder (create it if it doesn't exist). the code expects things in specific places and will complain if stuff is missing.
 
-**step 2:** run training:
+**step 2:** run training. here are commands for all model sizes:
 
-``python train_2d.py -net sam2 -exp_name REFUGE_MedSAM2 -vis 1 -sam_ckpt ./checkpoints/sam2_hiera_small.pt -sam_config sam2_hiera_s -image_size 1024 -out_size 1024 -b 4 -val_freq 1 -dataset REFUGE -data_path ./data/REFUGE``
+**hiera-tiny (fastest, ~6gb vram):**
+```bash
+python train_2d.py -net sam2 -exp_name REFUGE_MedSAM2_Tiny -vis 1 -sam_ckpt ./checkpoints/sam2_hiera_tiny.pt -sam_config sam2_hiera_t -image_size 1024 -out_size 1024 -b 4 -val_freq 1 -dataset REFUGE -data_path ./data/REFUGE
+```
+
+**hiera-small (default, ~8gb vram):**
+```bash
+python train_2d.py -net sam2 -exp_name REFUGE_MedSAM2_Small -vis 1 -sam_ckpt ./checkpoints/sam2_hiera_small.pt -sam_config sam2_hiera_s -image_size 1024 -out_size 1024 -b 4 -val_freq 1 -dataset REFUGE -data_path ./data/REFUGE
+```
+
+**hiera-base-plus (~12gb vram):**
+```bash
+python train_2d.py -net sam2 -exp_name REFUGE_MedSAM2_BasePlus -vis 1 -sam_ckpt ./checkpoints/sam2_hiera_base_plus.pt -sam_config sam2_hiera_b+ -image_size 1024 -out_size 1024 -b 4 -val_freq 1 -dataset REFUGE -data_path ./data/REFUGE
+```
+
+**hiera-large (best accuracy, ~20gb vram):**
+```bash
+python train_2d.py -net sam2 -exp_name REFUGE_MedSAM2_Large -vis 1 -sam_ckpt ./checkpoints/sam2_hiera_large.pt -sam_config sam2_hiera_l -image_size 1024 -out_size 1024 -b 4 -val_freq 1 -dataset REFUGE -data_path ./data/REFUGE
+```
 
 the `-vis 1` flag will save some visualization images so you can actually see what's happening. useful for debugging when things go wrong (which they will).
 
@@ -50,11 +68,65 @@ this one's more fun, 3d volumes and multiple organs. btcv dataset has like 13 di
 
 again, put it in the `data` folder. organization matters here.
 
-**step 2:** train on 3d data:
+**step 2:** train on 3d data. here are commands for all model sizes:
 
-``python train_3d.py -net sam2 -exp_name BTCV_MedSAM2 -sam_ckpt ./checkpoints/sam2_hiera_small.pt -sam_config sam2_hiera_s -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btcv``
+**hiera-tiny (fastest, ~6gb vram):**
+```bash
+python train_3d.py -net sam2 -exp_name BTCV_MedSAM2_Tiny -sam_ckpt ./checkpoints/sam2_hiera_tiny.pt -sam_config sam2_hiera_t -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btcv
+```
+
+**hiera-small (default, ~8gb vram):**
+```bash
+python train_3d.py -net sam2 -exp_name BTCV_MedSAM2_Small -sam_ckpt ./checkpoints/sam2_hiera_small.pt -sam_config sam2_hiera_s -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btcv
+```
+
+**hiera-base-plus (~12gb vram):**
+```bash
+python train_3d.py -net sam2 -exp_name BTCV_MedSAM2_BasePlus -sam_ckpt ./checkpoints/sam2_hiera_base_plus.pt -sam_config sam2_hiera_b+ -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btcv
+```
+
+**hiera-large (best accuracy, ~20gb vram):**
+```bash
+python train_3d.py -net sam2 -exp_name BTCV_MedSAM2_Large -sam_ckpt ./checkpoints/sam2_hiera_large.pt -sam_config sam2_hiera_l -image_size 1024 -val_freq 1 -prompt bbox -prompt_freq 2 -dataset btcv -data_path ./data/btcv
+```
 
 the `-prompt bbox` means we're using bounding box prompts (you can also use points or masks). `-prompt_freq 2` means every 2 epochs we'll do some prompt-based validation. play around with these if you want.
+
+**note:** if you have a powerful gpu (a100, h100, etc), you can increase batch size (`-b`) for larger models. try `-b 8` or `-b 16` for large model if you have the vram.
+
+## inference (running predictions after training)
+
+so you've trained a model and want to actually use it. here's how:
+
+**for 3d volumes:**
+
+```bash
+python inference_3d.py \
+  -checkpoint ./logs/BTCV_MedSAM2_*/Model/best_dice_epoch.pth \
+  -sam_config sam2_hiera_s \
+  -data_path ./data/btcv \
+  -dataset btcv \
+  -prompt bbox \
+  -output_dir ./inference_results \
+  -save_vis
+```
+
+the script will:
+- load your trained checkpoint
+- run predictions on test data
+- save prediction masks as .npy files
+- optionally save visualizations if you use `-save_vis`
+
+outputs go to `inference_results/` by default. each sample gets its own folder with predictions for each frame.
+
+**key args:**
+- `-checkpoint`: path to your trained model (usually `best_dice_epoch.pth` or `latest_epoch.pth`)
+- `-sam_config`: must match what you used for training (t/s/b+/l)
+- `-data_path`: where your test data lives
+- `-output_dir`: where to save results
+- `-save_vis`: adds this flag to generate side-by-side comparison images
+
+the checkpoint should be in your logs directory, something like `logs/BTCV_MedSAM2_2025_12_14_22_54_28/Model/best_dice_epoch.pth`. wandb will also log the best checkpoint path if you're using it.
 
 ## random notes and things that might help
 
@@ -85,20 +157,7 @@ available models:
 - **hiera-base-plus** (sam2_hiera_b+): 80m params, ~12gb vram. higher accuracy, still reasonably fast.
 - **hiera-large** (sam2_hiera_l): 224m params, ~20gb vram. best accuracy, slower training.
 
-to use a different model, just change the checkpoint and config:
-
-```bash
-# for tiny
-python train_3d.py -sam_ckpt ./checkpoints/sam2_hiera_tiny.pt -sam_config sam2_hiera_t ...
-
-# for base plus
-python train_3d.py -sam_ckpt ./checkpoints/sam2_hiera_base_plus.pt -sam_config sam2_hiera_b+ ...
-
-# for large
-python train_3d.py -sam_ckpt ./checkpoints/sam2_hiera_large.pt -sam_config sam2_hiera_l ...
-```
-
-main differences: larger models have more transformer blocks and wider embeddings. tiny has 12 blocks, small has 16, base+ has 24, large has 48. more blocks = better accuracy but slower training and more memory. if you have a beefy gpu (a100, h100, etc), go for large. if memory is tight, stick with small or tiny.
+complete training commands for all models are shown above in the quick start examples. main differences: larger models have more transformer blocks and wider embeddings. tiny has 12 blocks, small has 16, base+ has 24, large has 48. more blocks = better accuracy but slower training and more memory. if you have a beefy gpu (a100, h100, etc), go for large. if memory is tight, stick with small or tiny.
 
 see `MODEL_COMPARISON.md` for detailed specs and benchmarks.
 
