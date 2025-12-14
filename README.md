@@ -2,7 +2,7 @@
 
 hey so this is OUR  project for nyu deep learning class. basically trying to adapt sam2 (segment anything model 2) for medical imaging stuff. works pretty well honestly, sometimes crashes but that's debugging for you.
 
-## requirements (or whatever)
+## requirements 
 
 first things first, get your environment set up:
 
@@ -48,7 +48,7 @@ this one's more fun, 3d volumes and multiple organs. btcv dataset has like 13 di
 
 ``unzip btcv.zip``
 
-again, put it in the `data` folder. organization matters here.
+again, put it in the `data` folder. organization matters here. actually its part of the data dir itself, make sure when you run the train3d run command you map the check perfeclty, you can use ls -la to check all.
 
 **step 2:** train on 3d data:
 
@@ -77,7 +77,7 @@ the training uses a combination of the original sam2 loss and some medical-speci
 
 ## troubleshooting
 
-- "cuda out of memory": reduce batch size or image size
+- "cuda out of memory": reduce batch size or image size, i alos used an h200 sxm so training was much faster
 - "file not found": check your data paths, make sure folders exist
 - "module not found": did you activate the conda environment?
 - weird segmentation results: check your data preprocessing, maybe the normalization is off
