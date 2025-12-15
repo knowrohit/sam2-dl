@@ -30,7 +30,22 @@ this one's pretty straightforward. fundus images, segment the optic cup. classic
 
 ``unzip REFUGE.zip``
 
-make sure to put it in a `data` folder (create it if it doesn't exist). the code expects things in specific places and will complain if stuff is missing.
+make sure to put it in a `data` folder (create it if it doesn't exist). the code expects things in specific places and will complain if stuff is missing. wait here you go you can use this direclty :
+
+```# Create data directory if it doesn't exist
+mkdir -p data
+
+# Download the dataset directly into the data folder
+wget -P data https://huggingface.co/datasets/jiayuanz3/btcv/resolve/main/btcv.zip
+
+# Unzip in the data folder and then remove the zip file
+cd data
+unzip btcv.zip
+rm btcv.zip
+cd ..
+```
+
+
 
 **step 2:** run training. here are commands for all model sizes:
 
