@@ -178,6 +178,23 @@ complete training commands for all models are shown above in the quick start exa
 
 see `MODEL_COMPARISON.md` for detailed specs and benchmarks.
 
+**quick way to train both tiny and small together:**
+
+if you want to train both tiny and small models sequentially (useful for comparing results), use the shell script:
+
+```bash
+bash train_both_models.sh
+```
+
+or with custom options:
+
+```bash
+bash train_both_models.sh --dataset btcv --data-path ./data/btcv --batch-size 2 --image-size 1024
+```
+
+the script runs tiny first, then small. checkpoints get saved separately in their respective log directories.
+
+
 ## troubleshooting
 
 - "cuda out of memory": reduce batch size or image size, or use a smaller model variant
