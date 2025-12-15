@@ -15,6 +15,9 @@ PROMPT_FREQ=2
 BATCH_SIZE_TINY=1
 BATCH_SIZE_SMALL=1
 HIGH_MEMORY=false
+PARALLEL=false
+GPU_DEVICE_TINY=0
+GPU_DEVICE_SMALL=0
 
 # detect high-end gpu and suggest better defaults
 if command -v nvidia-smi &> /dev/null; then
@@ -72,6 +75,18 @@ while [[ $# -gt 0 ]]; do
             VAL_FREQ="$2"
             shift 2
             ;;
+        --parallel)
+            PARALLEL=true
+            shift
+            ;;
+        --gpu-device-tiny)
+            GPU_DEVICE_TINY="$2"
+            shift 2
+            ;;
+        --gpu-device-small)
+            GPU_DEVICE_SMALL="$2"
+            shift 2
+            ;;
         *)
             echo "unknown option: $1"
             echo "usage: $0 [options]"
@@ -84,6 +99,9 @@ while [[ $# -gt 0 ]]; do
             echo "  --batch-size-tiny SIZE       batch size for tiny model only"
             echo "  --batch-size-small SIZE      batch size for small model only"
             echo "  --high-memory               use aggressive batch sizes for h200/h100/a100 (tiny: 16, small: 12)"
+            echo "  --parallel                  run both models simultaneously"
+            echo "  --gpu-device-tiny ID        gpu device id for tiny model (default: 0)"
+            echo "  --gpu-device-small ID       gpu device id for small model (default: 0)"
             echo "  --prompt TYPE                prompt type: bbox or click (default: bbox)"
             echo "  --prompt-freq FREQ          prompt frequency (default: 2)"
             echo "  --val-freq FREQ             validation frequency (default: 1)"
@@ -92,6 +110,7 @@ while [[ $# -gt 0 ]]; do
             echo "  $0 --high-memory"
             echo "  $0 --batch-size 8"
             echo "  $0 --batch-size-tiny 16 --batch-size-small 8"
+            echo "  $0 --parallel --gpu-device-tiny 0 --gpu-device-small 0"
             exit 1
             ;;
     esac
@@ -111,60 +130,87 @@ echo "val freq: $VAL_FREQ"
 if [ "$HIGH_MEMORY" = true ]; then
     echo "high-memory mode: enabled"
 fi
+if [ "$PARALLEL" = true ]; then
+    echo "execution mode: parallel"
+    echo "gpu device (tiny): $GPU_DEVICE_TINY"
+    echo "gpu device (small): $GPU_DEVICE_SMALL"
+else
+    echo "execution mode: sequential"
+fi
 echo "=========================================="
 echo ""
 
 # train tiny model
-echo "starting training for hiera-tiny (batch size: $BATCH_SIZE_TINY)..."
-python train_3d.py \
-    -net sam2 \
-    -exp_name ${DATASET}_MedSAM2_Tiny \
-    -sam_ckpt ./checkpoints/sam2_hiera_tiny.pt \
-    -sam_config sam2_hiera_t \
-    -image_size $IMAGE_SIZE \
-    -val_freq $VAL_FREQ \
-    -prompt $PROMPT \
-    -prompt_freq $PROMPT_FREQ \
-    -dataset $DATASET \
-    -data_path $DATA_PATH \
-    -b $BATCH_SIZE_TINY
+run_tiny() {
+    echo "starting training for hiera-tiny (batch size: $BATCH_SIZE_TINY) on gpu $GPU_DEVICE_TINY..."
+    CUDA_VISIBLE_DEVICES=$GPU_DEVICE_TINY python train_3d.py \
+        -net sam2 \
+        -exp_name ${DATASET}_MedSAM2_Tiny \
+        -sam_ckpt ./checkpoints/sam2_hiera_tiny.pt \
+        -sam_config sam2_hiera_t \
+        -image_size $IMAGE_SIZE \
+        -val_freq $VAL_FREQ \
+        -prompt $PROMPT \
+        -prompt_freq $PROMPT_FREQ \
+        -dataset $DATASET \
+        -data_path $DATA_PATH \
+        -b $BATCH_SIZE_TINY
+}
 
-if [ $? -eq 0 ]; then
+# train small model
+run_small() {
+    echo "starting training for hiera-small (batch size: $BATCH_SIZE_SMALL) on gpu $GPU_DEVICE_SMALL..."
+    CUDA_VISIBLE_DEVICES=$GPU_DEVICE_SMALL python train_3d.py \
+        -net sam2 \
+        -exp_name ${DATASET}_MedSAM2_Small \
+        -sam_ckpt ./checkpoints/sam2_hiera_small.pt \
+        -sam_config sam2_hiera_s \
+        -image_size $IMAGE_SIZE \
+        -val_freq $VAL_FREQ \
+        -prompt $PROMPT \
+        -prompt_freq $PROMPT_FREQ \
+        -dataset $DATASET \
+        -data_path $DATA_PATH \
+        -b $BATCH_SIZE_SMALL
+}
+
+if [ "$PARALLEL" = true ]; then
+    echo "launching both trainings in parallel..."
+    set +e
+    run_tiny &
+    PID_TINY=$!
+    run_small &
+    PID_SMALL=$!
+    wait $PID_TINY
+    RC_TINY=$?
+    wait $PID_SMALL
+    RC_SMALL=$?
+    set -e
+
+    if [ $RC_TINY -ne 0 ]; then
+        echo ""
+        echo "tiny model training failed with exit code $RC_TINY"
+        exit 1
+    fi
+    if [ $RC_SMALL -ne 0 ]; then
+        echo ""
+        echo "small model training failed with exit code $RC_SMALL"
+        exit 1
+    fi
+else
+    run_tiny
     echo ""
     echo "tiny model training completed successfully!"
     echo ""
-else
-    echo ""
-    echo "tiny model training failed!"
-    exit 1
+
+    run_small
 fi
 
-# train small model
-echo "starting training for hiera-small (batch size: $BATCH_SIZE_SMALL)..."
-python train_3d.py \
-    -net sam2 \
-    -exp_name ${DATASET}_MedSAM2_Small \
-    -sam_ckpt ./checkpoints/sam2_hiera_small.pt \
-    -sam_config sam2_hiera_s \
-    -image_size $IMAGE_SIZE \
-    -val_freq $VAL_FREQ \
-    -prompt $PROMPT \
-    -prompt_freq $PROMPT_FREQ \
-    -dataset $DATASET \
-    -data_path $DATA_PATH \
-    -b $BATCH_SIZE_SMALL
-
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "small model training completed successfully!"
-    echo ""
-    echo "=========================================="
-    echo "both models trained successfully!"
-    echo "checkpoints saved in logs/${DATASET}_MedSAM2_*/Model/"
-    echo "=========================================="
-else
-    echo ""
-    echo "small model training failed!"
-    exit 1
-fi
+echo ""
+echo "small model training completed successfully!"
+echo ""
+echo "=========================================="
+echo "both models trained successfully!"
+echo "checkpoints saved in logs/${DATASET}_MedSAM2_*/Model/"
+echo "=========================================="
 
